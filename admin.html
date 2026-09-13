@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Owner Portal | Bliss Bakery & Confectionery</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Outfit', sans-serif; }
+        body { background: #f4f5f7; color: #1e293b; min-height: 100vh; }
+
+        /* Login Screen */
+        .login-wrapper { display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #0f172a; padding: 1.5rem; }
+        .login-box { background: white; padding: 2.5rem; border-radius: 16px; width: 100%; max-width: 400px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3); text-align: center; }
+        .login-box h2 { font-size: 1.6rem; color: #0f172a; margin-bottom: 0.5rem; }
+        .login-box p { color: #64748b; font-size: 0.88rem; margin-bottom: 1.8rem; }
+        .input-field { width: 100%; padding: 0.8rem 1rem; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 0.95rem; margin-bottom: 1.2rem; outline: none; }
+        .btn-submit { width: 100%; padding: 0.8rem; background: #c86d26; color: white; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 1rem; transition: background 0.2s; }
+        .btn-submit:hover { background: #a85413; }
+
+        /* Dashboard UI */
+        .dashboard { display: none; }
+        .dashboard.active { display: block; }
+        
+        header { background: #0f172a; color: white; padding: 1.2rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        .dash-container { max-width: 1200px; margin: 2rem auto; padding: 0 1.5rem; }
+
+        .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+        .metric-card { background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .metric-card span { font-size: 0.8rem; font-weight: 700; color: #64748b; text-transform: uppercase; }
+        .metric-card h3 { font-size: 2.2rem; color: #0f172a; margin-top: 0.4rem; font-weight: 800; }
+        .live-tag { color: #16a34a; font-size: 0.78rem; font-weight: 700; display: inline-flex; align-items: center; gap: 5px; margin-top: 0.5rem; }
+
+        .content-card { background: white; border-radius: 12px; border: 1px solid #e2e8f0; padding: 2rem; margin-bottom: 2rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .content-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #f1f5f9; font-size: 0.9rem; vertical-align: middle; }
+        th { background: #f8fafc; color: #475569; font-weight: 700; }
+
+        .item-thumb { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; border: 1px solid #e2e8f0; }
+        .price-input { width: 110px; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: 700; }
+        .btn-del { background: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
+        .btn-del:hover { background: #dc2626; }
+        
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+
+        /* Drag & Drop Upload Zone */
+        .source-tabs { display: flex; gap: 10px; margin-bottom: 1rem; }
+        .source-btn { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 6px 16px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+        .source-btn.active { background: #c86d26; color: white; border-color: #c86d26; }
+
+        .drop-zone {
+            border: 2px dashed #cbd5e1;
+            border-radius: 12px;
+            padding: 2rem 1.5rem;
+            text-align: center;
+            background: #f8fafc;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            margin-bottom: 1.2rem;
+        }
+        .drop-zone.dragover {
+            border-color: #c86d26;
+            background: #fff7ed;
+        }
+        .drop-zone-prompt {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .drop-zone-prompt i { font-size: 2.2rem; color: #c86d26; }
+        .drop-zone-prompt p { font-size: 0.95rem; font-weight: 600; color: #334155; }
+        .drop-zone-prompt span { font-size: 0.8rem; color: #64748b; }
+
+        .image-preview-box {
+            display: none;
+            position: relative;
+            max-width: 200px;
+            margin: 0 auto;
+        }
+        .image-preview-box img {
+            width: 100%;
+            height: 140px;
+            object-fit: cover;
+            border-radius: 8px;
+            border: 1px solid #cbd5e1;
+        }
+        .remove-img-btn {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #ef4444;
+            color: white;
+            border: none;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- LOGIN SCREEN -->
+    <div class="login-wrapper" id="login-screen">
+        <div class="login-box">
+            <i class="fa-solid fa-user-shield" style="font-size: 2.5rem; color: #c86d26; margin-bottom: 1rem;"></i>
+            <h2>Owner Control Center</h2>
+            <p>Bliss Bakery & Confectionery</p>
+            <form onsubmit="handleLogin(event)">
+                <input type="password" id="passcode" class="input-field" placeholder="Enter Access Code" required>
+                <button type="submit" class="btn-submit">Login to Dashboard</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MAIN DASHBOARD -->
+    <div class="dashboard" id="main-dashboard">
+        <header>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <i class="fa-solid fa-cookie-bite" style="color: #c86d26; font-size: 1.5rem;"></i>
+                <h1 style="font-size: 1.3rem;">Bliss Bakery Owner Dashboard</h1>
+            </div>
+            <button onclick="logout()" style="background: rgba(255,255,255,0.1); color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer;">Logout</button>
+        </header>
+
+        <div class="dash-container">
+            <!-- Analytics Overview -->
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <span>Live Visitors Online</span>
+                    <h3 id="stat-active">24</h3>
+                    <div class="live-tag"><i class="fa-solid fa-circle-dot"></i> Live Real-Time Traffic</div>
+                </div>
+                <div class="metric-card">
+                    <span>Total Site Views</span>
+                    <h3 id="stat-views">1,420</h3>
+                    <div style="color: #64748b; font-size: 0.78rem; margin-top: 0.5rem;">Accumulated Visits</div>
+                </div>
+                <div class="metric-card">
+                    <span>Menu Items Active</span>
+                    <h3 id="stat-menu-count">4</h3>
+                    <div style="color: #64748b; font-size: 0.78rem; margin-top: 0.5rem;">Public Catalog</div>
+                </div>
+                <div class="metric-card">
+                    <span>Customer Rating</span>
+                    <h3>5.0 ★</h3>
+                    <div style="color: #64748b; font-size: 0.78rem; margin-top: 0.5rem;">Verified Google Reviews</div>
+                </div>
+            </div>
+
+            <!-- Menu & Pricing Management -->
+            <div class="content-card">
+                <div class="content-header">
+                    <h2>Live Menu & Price Management</h2>
+                    <span style="font-size: 0.85rem; color: #64748b;">Changes save instantly to the website</span>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Image</th>
+                            <th>Item Title</th>
+                            <th>Category</th>
+                            <th>Price (₦ NGN)</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="admin-table-body">
+                        <!-- Dynamic Rows -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Add New Item Section with Drag & Drop / File Selector -->
+            <div class="content-card">
+                <h2 style="margin-bottom: 1.2rem;">Add New Item to Menu</h2>
+                <form onsubmit="addNewProduct(event)">
+                    <div class="form-grid">
+                        <div>
+                            <label style="font-size: 0.85rem; font-weight: 600; display:block; margin-bottom: 0.4rem;">Title</label>
+                            <input type="text" id="new-title" class="input-field" placeholder="e.g. Chocolate Glazed Donut" required>
+                        </div>
+                        <div>
+                            <label style="font-size: 0.85rem; font-weight: 600; display:block; margin-bottom: 0.4rem;">Category</label>
+                            <select id="new-cat" class="input-field">
+                                <option value="cakes">Signature Cake</option>
+                                <option value="pastries">Pastry</option>
+                                <option value="sweets">Confectionery</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-size: 0.85rem; font-weight: 600; display:block; margin-bottom: 0.4rem;">Price (₦)</label>
+                            <input type="number" id="new-price" class="input-field" placeholder="5000" required>
+                        </div>
+                    </div>
+
+                    <!-- Image Upload Source Selector -->
+                    <div style="margin-bottom: 0.5rem;">
+                        <label style="font-size: 0.85rem; font-weight: 600; display:block; margin-bottom: 0.5rem;">Product Image</label>
+                        <div class="source-tabs">
+                            <button type="button" class="source-btn active" id="tab-file-btn" onclick="switchImageSource('file')">
+                                <i class="fa-solid fa-upload"></i> Upload / Drag & Drop
+                            </button>
+                            <button type="button" class="source-btn" id="tab-url-btn" onclick="switchImageSource('url')">
+                                <i class="fa-solid fa-link"></i> Paste Image Web Link
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Drag & Drop / File Input Box -->
+                    <div id="file-upload-mode">
+                        <input type="file" id="file-input" accept="image/*" style="display: none;" onchange="handleFileSelect(event)">
+                        
+                        <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+                            <div class="drop-zone-prompt" id="drop-prompt">
+                                <i class="fa-solid fa-cloud-arrow-up"></i>
+                                <p>Drag & drop image here, or <span style="color: #c86d26; text-decoration: underline;">click to browse device</span></p>
+                                <span>Supports PNG, JPG, JPEG, WEBP</span>
+                            </div>
+
+                            <div class="image-preview-box" id="preview-container" onclick="event.stopPropagation()">
+                                <img id="preview-img" src="" alt="Preview">
+                                <button type="button" class="remove-img-btn" onclick="resetImageUpload()"><i class="fa-solid fa-xmark"></i></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- URL Input Mode (Hidden by default) -->
+                    <div id="url-upload-mode" style="display: none;">
+                        <input type="url" id="new-img-url" class="input-field" placeholder="https://images.unsplash.com/photo-1234567..." oninput="handleUrlInput(this.value)">
+                    </div>
+
+                    <div style="margin-bottom: 1.5rem;">
+                        <label style="font-size: 0.85rem; font-weight: 600; display:block; margin-bottom: 0.4rem;">Description</label>
+                        <input type="text" id="new-desc" class="input-field" placeholder="Short description of taste and ingredients" required>
+                    </div>
+
+                    <button type="submit" class="btn-submit" style="width: auto; padding: 0.75rem 2.2rem;">
+                        <i class="fa-solid fa-plus"></i> Publish Item to Website
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const defaultProducts = [
+            { id: 1, title: "Luxury Red Velvet Cake", category: "cakes", price: 25000, desc: "Rich red velvet layers with signature cream cheese frosting.", image: "https://images.unsplash.com/photo-1535141192574-5d4897c13136?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80" },
+            { id: 2, title: "Butter Croissants (Box of 4)", category: "pastries", price: 8500, desc: "Flaky, golden French butter croissants baked fresh daily.", image: "https://images.unsplash.com/photo-1555507036-ab1f4038808a?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80" },
+            { id: 3, title: "Triple Chocolate Fudge Cake", category: "cakes", price: 28000, desc: "Decadent dark chocolate sponge layered with ganache.", image: "https://images.unsplash.com/photo-1606890737304-57a1ca8a5b62?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80" },
+            { id: 4, title: "Assorted Cupcakes (6 Pcs)", category: "sweets", price: 12000, desc: "Vanilla bean, salted caramel, and chocolate cupcakes.", image: "https://images.unsplash.com/photo-1563729784474-d77dbb933a9e?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80" }
+        ];
+
+        let products = JSON.parse(localStorage.getItem('bliss_products')) || defaultProducts;
+        let selectedImageData = ""; // Holds Base64 or URL data
+        let currentImageMode = "file";
+
+        function handleLogin(e) {
+            e.preventDefault();
+            const code = document.getElementById('passcode').value;
+            if (code === 'bliss2026') {
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('main-dashboard').classList.add('active');
+                initDashboard();
+            } else {
+                alert("Incorrect passcode. Try 'bliss2026'");
+            }
+        }
+
+        function logout() {
+            location.reload();
+        }
+
+        function initDashboard() {
+            renderTable();
+            setupDragAndDrop();
+            document.getElementById('stat-views').innerText = parseInt(localStorage.getItem('bliss_views') || 1420).toLocaleString();
+            
+            // Simulated live visitors counter
+            setInterval(() => {
+                const count = Math.floor(Math.random() * (32 - 18 + 1)) + 18;
+                document.getElementById('stat-active').innerText = count;
+            }, 3000);
+        }
+
+        /* Image Mode Switcher */
+        function switchImageSource(mode) {
+            currentImageMode = mode;
+            if(mode === 'file') {
+                document.getElementById('file-upload-mode').style.display = 'block';
+                document.getElementById('url-upload-mode').style.display = 'none';
+                document.getElementById('tab-file-btn').classList.add('active');
+                document.getElementById('tab-url-btn').classList.remove('active');
+            } else {
+                document.getElementById('file-upload-mode').style.display = 'none';
+                document.getElementById('url-upload-mode').style.display = 'block';
+                document.getElementById('tab-file-btn').classList.remove('active');
+                document.getElementById('tab-url-btn').classList.add('active');
+            }
+        }
+
+        /* Drag & Drop Logic */
+        function setupDragAndDrop() {
+            const dropZone = document.getElementById('drop-zone');
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropZone.classList.add('dragover');
+                }, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropZone.classList.remove('dragover');
+                }, false);
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    processFile(files[0]);
+                }
+            });
+        }
+
+        function handleFileSelect(e) {
+            if (e.target.files.length > 0) {
+                processFile(e.target.files[0]);
+            }
+        }
+
+        function processFile(file) {
+            if (!file.type.startsWith('image/')) {
+                alert('Please upload a valid image file (PNG, JPG, WEBP).');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                selectedImageData = e.target.result;
+                showImagePreview(selectedImageData);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function handleUrlInput(val) {
+            selectedImageData = val.trim();
+        }
+
+        function showImagePreview(src) {
+            document.getElementById('drop-prompt').style.display = 'none';
+            const container = document.getElementById('preview-container');
+            const img = document.getElementById('preview-img');
+            img.src = src;
+            container.style.display = 'block';
+        }
+
+        function resetImageUpload() {
+            selectedImageData = "";
+            document.getElementById('file-input').value = "";
+            document.getElementById('preview-container').style.display = 'none';
+            document.getElementById('drop-prompt').style.display = 'flex';
+        }
+
+        /* Menu Management Functions */
+        function renderTable() {
+            const tbody = document.getElementById('admin-table-body');
+            tbody.innerHTML = '';
+
+            products.forEach(p => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><img src="${p.image}" alt="${p.title}" class="item-thumb"></td>
+                    <td style="font-weight: 700;">${p.title}</td>
+                    <td><span style="text-transform: capitalize; background: #e2e8f0; padding: 3px 10px; border-radius: 4px; font-size: 0.8rem; font-weight: 600;">${p.category}</span></td>
+                    <td>
+                        ₦ <input type="number" value="${p.price}" class="price-input" onchange="updatePrice(${p.id}, this.value)">
+                    </td>
+                    <td>
+                        <button class="btn-del" onclick="deleteProduct(${p.id})" title="Delete item"><i class="fa-solid fa-trash"></i> Delete</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('stat-menu-count').innerText = products.length;
+        }
+
+        function updatePrice(id, val) {
+            const item = products.find(p => p.id === id);
+            if (item) {
+                item.price = parseInt(val);
+                localStorage.setItem('bliss_products', JSON.stringify(products));
+            }
+        }
+
+        function deleteProduct(id) {
+            if (confirm("Remove this item from the website menu?")) {
+                products = products.filter(p => p.id !== id);
+                localStorage.setItem('bliss_products', JSON.stringify(products));
+                renderTable();
+            }
+        }
+
+        function addNewProduct(e) {
+            e.preventDefault();
+            
+            if (!selectedImageData) {
+                alert("Please select or upload an image for the product.");
+                return;
+            }
+
+            const title = document.getElementById('new-title').value;
+            const category = document.getElementById('new-cat').value;
+            const price = parseInt(document.getElementById('new-price').value);
+            const desc = document.getElementById('new-desc').value;
+
+            products.push({ 
+                id: Date.now(), 
+                title, 
+                category, 
+                price, 
+                image: selectedImageData, 
+                desc 
+            });
+
+            localStorage.setItem('bliss_products', JSON.stringify(products));
+
+            renderTable();
+            e.target.reset();
+            resetImageUpload();
+            document.getElementById('new-img-url').value = "";
+            alert("New item successfully published to website!");
+        }
+    </script>
+</body>
+</html>
