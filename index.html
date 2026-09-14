@@ -121,7 +121,8 @@
             <h2>Owner Control Center</h2>
             <p>Bliss Bakery & Confectionery</p>
             <form onsubmit="handleLogin(event)">
-                <input type="password" id="passcode" class="input-field" placeholder="Enter Access Code" required>
+                <input type="email" id="admin-email" class="input-field" placeholder="Admin email address" autocomplete="username" required>
+                <input type="password" id="passcode" class="input-field" placeholder="Admin password" autocomplete="current-password" required>
                 <button type="submit" class="btn-submit">Login to Dashboard</button>
             </form>
         </div>
@@ -257,44 +258,121 @@
         </div>
     </div>
 
+    <!-- Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-        const defaultProducts = [
-            { id: 1, title: "Luxury Red Velvet Cake", category: "cakes", price: 25000, desc: "Rich red velvet layers with signature cream cheese frosting.", image: "https://images.unsplash.com/photo-1535141192574-5d4897c13136?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80" },
-            { id: 2, title: "Butter Croissants (Box of 4)", category: "pastries", price: 8500, desc: "Flaky, golden French butter croissants baked fresh daily.", image: "https://images.unsplash.com/photo-1555507036-ab1f4038808a?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80" },
-            { id: 3, title: "Triple Chocolate Fudge Cake", category: "cakes", price: 28000, desc: "Decadent dark chocolate sponge layered with ganache.", image: "https://images.unsplash.com/photo-1606890737304-57a1ca8a5b62?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80" },
-            { id: 4, title: "Assorted Cupcakes (6 Pcs)", category: "sweets", price: 12000, desc: "Vanilla bean, salted caramel, and chocolate cupcakes.", image: "https://images.unsplash.com/photo-1563729784474-d77dbb933a9e?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80" }
-        ];
-
-        let products = JSON.parse(localStorage.getItem('bliss_products')) || defaultProducts;
-        let selectedImageData = ""; // Holds Base64 or URL data
+        // =============================================================
+        // SUPABASE CONFIGURATION
+        // Replace these placeholders with values from:
+        // Supabase Dashboard -> Settings -> API
+        // =============================================================
+        const SUPABASE_URL = 'https://znzxjthhbfznowvqrzun.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpuenhqdGhoYmZ6bm93dnFyenVuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkzMzE4MjUsImV4cCI6MjEwNDkwNzgyNX0.MQr88OHGpb03qYJMiqcLaLNt5cviPM9LWuGVspAFLTA';
+        const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const STORAGE_BUCKET = 'product-images';
+        let products = [];
+        let selectedImageFile = null;
+        let selectedImageData = "";
         let currentImageMode = "file";
 
-        function handleLogin(e) {
-            e.preventDefault();
-            const code = document.getElementById('passcode').value;
-            if (code === 'bliss2026') {
-                document.getElementById('login-screen').style.display = 'none';
-                document.getElementById('main-dashboard').classList.add('active');
-                initDashboard();
-            } else {
-                alert("Incorrect passcode. Try 'bliss2026'");
-            }
+        function isConfigured() {
+            return SUPABASE_URL && SUPABASE_ANON_KEY && !SUPABASE_URL.includes('YOUR_SUPABASE');
         }
 
-        function logout() {
+        async function handleLogin(e) {
+            e.preventDefault();
+
+            if (!isConfigured()) {
+                alert('Supabase is not configured yet. Add your Supabase URL and publishable/anon key to this file.');
+                return;
+            }
+
+            const email = document.getElementById('admin-email').value.trim();
+            const password = document.getElementById('passcode').value;
+            const { data, error } = await sb.auth.signInWithPassword({ email, password });
+
+            if (error) {
+                console.error(error);
+                alert(error.message || 'Login failed.');
+                return;
+            }
+
+            const { data: profile, error: profileError } = await sb
+                .from('profiles')
+                .select('role')
+                .eq('id', data.user.id)
+                .single();
+
+            if (profileError || profile?.role !== 'admin') {
+                await sb.auth.signOut();
+                alert('This account does not have admin access.');
+                return;
+            }
+
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('main-dashboard').classList.add('active');
+            initDashboard();
+        }
+
+        async function logout() {
+            await sb.auth.signOut();
             location.reload();
         }
 
-        function initDashboard() {
+        async function initDashboard() {
+            await loadProducts();
             renderTable();
             setupDragAndDrop();
-            document.getElementById('stat-views').innerText = parseInt(localStorage.getItem('bliss_views') || 1420).toLocaleString();
-            
-            // Simulated live visitors counter
+            await loadStats();
+
+            setInterval(async () => {
+                await loadProducts();
+                renderTable();
+                await loadStats();
+            }, 15000);
+
+            // Simulated live visitors counter. Replace with real analytics later.
             setInterval(() => {
                 const count = Math.floor(Math.random() * (32 - 18 + 1)) + 18;
                 document.getElementById('stat-active').innerText = count;
             }, 3000);
+        }
+
+        async function loadProducts() {
+            const { data, error } = await sb
+                .from('products')
+                .select('id,title,category,price,description,image_url')
+                .order('created_at', { ascending: true });
+
+            if (error) {
+                console.error(error);
+                alert('Could not load products from Supabase. Check your database setup and RLS policies.');
+                products = [];
+                return;
+            }
+
+            products = (data || []).map(p => ({
+                id: p.id,
+                title: p.title,
+                category: p.category,
+                price: Number(p.price),
+                desc: p.description,
+                image: p.image_url
+            }));
+        }
+
+        async function loadStats() {
+            const { data: stats, error } = await sb
+                .from('site_stats')
+                .select('views')
+                .eq('id', 1)
+                .single();
+
+            if (!error && stats) {
+                document.getElementById('stat-views').innerText = Number(stats.views).toLocaleString();
+            }
+
+            document.getElementById('stat-menu-count').innerText = products.length;
         }
 
         /* Image Mode Switcher */
@@ -335,16 +413,12 @@
 
             dropZone.addEventListener('drop', (e) => {
                 const files = e.dataTransfer.files;
-                if (files.length > 0) {
-                    processFile(files[0]);
-                }
+                if (files.length > 0) processFile(files[0]);
             });
         }
 
         function handleFileSelect(e) {
-            if (e.target.files.length > 0) {
-                processFile(e.target.files[0]);
-            }
+            if (e.target.files.length > 0) processFile(e.target.files[0]);
         }
 
         function processFile(file) {
@@ -353,6 +427,7 @@
                 return;
             }
 
+            selectedImageFile = file;
             const reader = new FileReader();
             reader.onload = function(e) {
                 selectedImageData = e.target.result;
@@ -363,6 +438,8 @@
 
         function handleUrlInput(val) {
             selectedImageData = val.trim();
+            selectedImageFile = null;
+            if (selectedImageData) showImagePreview(selectedImageData);
         }
 
         function showImagePreview(src) {
@@ -375,9 +452,36 @@
 
         function resetImageUpload() {
             selectedImageData = "";
+            selectedImageFile = null;
             document.getElementById('file-input').value = "";
             document.getElementById('preview-container').style.display = 'none';
             document.getElementById('drop-prompt').style.display = 'flex';
+        }
+
+        async function uploadImageIfNeeded() {
+            if (currentImageMode === 'url') {
+                const url = document.getElementById('new-img-url').value.trim();
+                if (!url) throw new Error('Please provide an image URL.');
+                return url;
+            }
+
+            if (!selectedImageFile) throw new Error('Please select or upload an image for the product.');
+
+            const safeName = selectedImageFile.name.replace(/[^a-zA-Z0-9._-]/g, '-');
+            const path = `${Date.now()}-${safeName}`;
+
+            const { error: uploadError } = await sb.storage
+                .from(STORAGE_BUCKET)
+                .upload(path, selectedImageFile, {
+                    cacheControl: '3600',
+                    upsert: false,
+                    contentType: selectedImageFile.type
+                });
+
+            if (uploadError) throw uploadError;
+
+            const { data } = sb.storage.from(STORAGE_BUCKET).getPublicUrl(path);
+            return data.publicUrl;
         }
 
         /* Menu Management Functions */
@@ -385,17 +489,23 @@
             const tbody = document.getElementById('admin-table-body');
             tbody.innerHTML = '';
 
+            if (!products.length) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#64748b;">No products found.</td></tr>';
+                document.getElementById('stat-menu-count').innerText = '0';
+                return;
+            }
+
             products.forEach(p => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td><img src="${p.image}" alt="${p.title}" class="item-thumb"></td>
-                    <td style="font-weight: 700;">${p.title}</td>
-                    <td><span style="text-transform: capitalize; background: #e2e8f0; padding: 3px 10px; border-radius: 4px; font-size: 0.8rem; font-weight: 600;">${p.category}</span></td>
+                    <td><img src="${escapeHtml(p.image)}" alt="${escapeHtml(p.title)}" class="item-thumb"></td>
+                    <td style="font-weight: 700;">${escapeHtml(p.title)}</td>
+                    <td><span style="text-transform: capitalize; background: #e2e8f0; padding: 3px 10px; border-radius: 4px; font-size: 0.8rem; font-weight: 600;">${escapeHtml(p.category)}</span></td>
                     <td>
-                        ₦ <input type="number" value="${p.price}" class="price-input" onchange="updatePrice(${p.id}, this.value)">
+                        ₦ <input type="number" value="${Number(p.price)}" class="price-input" onchange="updatePrice(${Number(p.id)}, this.value)">
                     </td>
                     <td>
-                        <button class="btn-del" onclick="deleteProduct(${p.id})" title="Delete item"><i class="fa-solid fa-trash"></i> Delete</button>
+                        <button class="btn-del" onclick="deleteProduct(${Number(p.id)})" title="Delete item"><i class="fa-solid fa-trash"></i> Delete</button>
                     </td>
                 `;
                 tbody.appendChild(tr);
@@ -404,52 +514,142 @@
             document.getElementById('stat-menu-count').innerText = products.length;
         }
 
-        function updatePrice(id, val) {
-            const item = products.find(p => p.id === id);
-            if (item) {
-                item.price = parseInt(val);
-                localStorage.setItem('bliss_products', JSON.stringify(products));
-            }
-        }
-
-        function deleteProduct(id) {
-            if (confirm("Remove this item from the website menu?")) {
-                products = products.filter(p => p.id !== id);
-                localStorage.setItem('bliss_products', JSON.stringify(products));
+        async function updatePrice(id, val) {
+            const price = Number(val);
+            if (!Number.isFinite(price) || price < 0) {
+                alert('Please enter a valid price.');
                 renderTable();
-            }
-        }
-
-        function addNewProduct(e) {
-            e.preventDefault();
-            
-            if (!selectedImageData) {
-                alert("Please select or upload an image for the product.");
                 return;
             }
 
-            const title = document.getElementById('new-title').value;
-            const category = document.getElementById('new-cat').value;
-            const price = parseInt(document.getElementById('new-price').value);
-            const desc = document.getElementById('new-desc').value;
+            const { error } = await sb
+                .from('products')
+                .update({ price })
+                .eq('id', id);
 
-            products.push({ 
-                id: Date.now(), 
-                title, 
-                category, 
-                price, 
-                image: selectedImageData, 
-                desc 
-            });
+            if (error) {
+                console.error(error);
+                alert(error.message || 'Could not update the price.');
+                await loadProducts();
+                renderTable();
+                return;
+            }
 
-            localStorage.setItem('bliss_products', JSON.stringify(products));
-
+            await loadProducts();
             renderTable();
-            e.target.reset();
-            resetImageUpload();
-            document.getElementById('new-img-url').value = "";
-            alert("New item successfully published to website!");
         }
+
+        async function deleteProduct(id) {
+            if (!confirm("Remove this item from the website menu?")) return;
+
+            const { data: item, error: fetchError } = await sb
+                .from('products')
+                .select('image_url')
+                .eq('id', id)
+                .single();
+
+            if (fetchError) {
+                alert(fetchError.message);
+                return;
+            }
+
+            const { error } = await sb.from('products').delete().eq('id', id);
+            if (error) {
+                console.error(error);
+                alert(error.message || 'Could not delete the product.');
+                return;
+            }
+
+            // Clean up a product image when it came from our storage bucket.
+            try {
+                const url = item?.image_url || '';
+                const marker = `/storage/v1/object/public/${STORAGE_BUCKET}/`;
+                const index = url.indexOf(marker);
+                if (index !== -1) {
+                    const path = url.slice(index + marker.length);
+                    await sb.storage.from(STORAGE_BUCKET).remove([path]);
+                }
+            } catch (cleanupError) {
+                console.warn('Image cleanup failed:', cleanupError);
+            }
+
+            await loadProducts();
+            renderTable();
+            await loadStats();
+        }
+
+        async function addNewProduct(e) {
+            e.preventDefault();
+
+            if (!isConfigured()) {
+                alert('Supabase is not configured yet.');
+                return;
+            }
+
+            const title = document.getElementById('new-title').value.trim();
+            const category = document.getElementById('new-cat').value;
+            const price = parseInt(document.getElementById('new-price').value, 10);
+            const desc = document.getElementById('new-desc').value.trim();
+
+            if (!title || !desc || !Number.isFinite(price)) {
+                alert('Please complete all product fields.');
+                return;
+            }
+
+            try {
+                const imageUrl = await uploadImageIfNeeded();
+
+                const { error } = await sb.from('products').insert({
+                    title,
+                    category,
+                    price,
+                    description: desc,
+                    image_url: imageUrl
+                });
+
+                if (error) throw error;
+
+                await loadProducts();
+                renderTable();
+                await loadStats();
+                e.target.reset();
+                resetImageUpload();
+                document.getElementById('new-img-url').value = "";
+                alert("New item successfully published to the shared website database!");
+            } catch (error) {
+                console.error(error);
+                alert(error.message || 'Could not publish the product.');
+            }
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#039;');
+        }
+
+        async function restoreSession() {
+            if (!isConfigured()) return;
+            const { data: { session } } = await sb.auth.getSession();
+            if (!session) return;
+
+            const { data: profile } = await sb
+                .from('profiles')
+                .select('role')
+                .eq('id', session.user.id)
+                .maybeSingle();
+
+            if (profile?.role === 'admin') {
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('main-dashboard').classList.add('active');
+                initDashboard();
+            }
+        }
+
+        window.addEventListener('load', restoreSession);
     </script>
 </body>
 </html>
